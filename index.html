@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Max Safe Sun Time</title>
+  <title>Sunburn timer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
@@ -116,12 +116,31 @@
       border-radius:2px;
     }
 
+    /* FIXED LEGEND: place labels at exact positions (0%, 33.33%, 100%) */
     .bar-legend{
-      display:flex;
-      justify-content:space-between;
+      position:relative;
+      height:14px;
+      margin-top:0.45rem;
       font-size:0.72rem;
       color:var(--text-muted);
-      margin-top:0.45rem;
+    }
+    .bar-legend span{
+      position:absolute;
+      top:0;
+      transform: translateX(-50%);
+      white-space:nowrap;
+    }
+    .bar-legend .legend-left{
+      left:0%;
+      transform: translateX(0%);
+    }
+    .bar-legend .legend-mid{
+      left:33.33%;
+      transform: translateX(-50%);
+    }
+    .bar-legend .legend-right{
+      left:100%;
+      transform: translateX(-100%);
     }
 
     /* Slider layout */
@@ -231,9 +250,10 @@
 
 <body>
 <div class="container">
-  <h1>Max Safe Sun Time</h1>
+  <h1>Sunburn timer</h1>
   <div class="sub">
     Prototype model. Adjust Skin Type, SPF, and UV Index to estimate maximum time in direct sun.
+    All calculations assume you reapply after swimming, sweating, and at the latest every 2 hours.
   </div>
 
   <!-- OUTPUT WELL (viz + only output) -->
@@ -252,9 +272,9 @@
       </div>
 
       <div class="bar-legend">
-        <span>0 min</span>
-        <span>2h</span>
-        <span>6h+</span>
+        <span class="legend-left">0 min</span>
+        <span class="legend-mid">2h reapply</span>
+        <span class="legend-right">6h+</span>
       </div>
     </div>
 
@@ -367,16 +387,11 @@
 
   // SPF effect: diminishing returns (toy model, avoids “SPF 30 => 30x time” explosion)
   // effectiveMultiplier = 1 + 0.9 * sqrt(SPF)
-  // SPF 0 => 1.0x
-  // SPF 10 => ~3.8x, SPF 30 => ~5.9x, SPF 50 => ~7.4x
   function spfEffectiveMultiplier(spf){
     if (spf <= 0) return 1;
     return 1 + 0.9 * Math.sqrt(spf);
   }
 
-  // Model:
-  // baselineBurn = baselineAtUVI1 / max(UVI, 0.5)
-  // maxSafe = baselineBurn * effectiveMultiplier
   function compute(){
     const skin = parseInt(skinSlider.value, 10);
     const spf  = SPF_OPTIONS[parseInt(spfSlider.value, 10)] ?? 30;
@@ -394,22 +409,34 @@
     return { skin, spf, uvi, baselineAt1, maxSafe };
   }
 
-function updateViz(state){
+  function updateViz(state){
+    // 0..360 min maps to 0..100% (6h saturates)
+    const clampMax = 360;
+
+    const pct = Math.max(0, Math.min(1, state.maxSafe / clampMax));
+    barFill.style.width = `${Math.round(pct * 100)}%`;
+
+    // Bar color reflects UVI severity
+    barFill.style.backgroundColor = uviColor(state.uvi);
+
+    // Reapply tick at EXACT 120 min on the same scale (33.33%)
+    const reapplyPct = 120 / clampMax;
+    reapplyTick.style.left = `calc(${(reapplyPct * 100).toFixed(2)}% - 1px)`;
+
+    vizMinutes.textContent = formatMinutes(state.maxSafe);
+  }
 
   function updateUI(){
     const s = compute();
 
-    // Labels
     skinLabel.textContent = skinTypeLabel(s.skin);
     spfLabel.textContent  = (s.spf === 0) ? "No SPF" : (s.spf === 50 ? "SPF 50+" : `SPF ${s.spf}`);
     uviLabel.textContent  = `UVI ${s.uvi}`;
 
-    // Swatches
     skinSwatch.style.background = skinColor(s.skin);
     spfSwatch.style.background  = "linear-gradient(90deg, rgba(96,165,250,0.45), rgba(34,197,94,0.45))";
     uviSwatch.style.background  = uviColor(s.uvi);
 
-    // Viz + single output
     updateViz(s);
     maxSafeMain.textContent = formatMinutes(s.maxSafe);
   }
