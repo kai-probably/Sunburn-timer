@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Max Safe Sun Time</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card-bg:#ffffff;
+      --text-main:#111827;
+      --text-muted:#6b7280;
+      --border-subtle:#e5e7eb;
+
+      /* UVI category colors (discrete) */
+      --uvi-low:#22c55e;        /* 0–2 */
+      --uvi-mod:#facc15;        /* 3–5 */
+      --uvi-high:#f59e0b;       /* 6–7 */
+      --uvi-vhigh:#f97373;      /* 8–10 */
+      --uvi-ext:#8b5cf6;        /* 11 */
+
+      /* Skin type swatches (approx) */
+      --skin1:#fde7d3;
+      --skin2:#f8d2b4;
+      --skin3:#eab792;
+      --skin4:#cf936c;
+      --skin5:#a56b45;
+      --skin6:#6b3f27;
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      margin:0;
+      padding:1.5rem;
+      background:var(--bg);
+      color:var(--text-main);
+    }
+
+    .container{
+      max-width:820px;
+      margin:0 auto;
+      background:var(--card-bg);
+      border-radius:18px;
+      padding:1.5rem 1.5rem 2rem;
+      box-shadow:0 12px 30px rgba(15,23,42,0.08);
+    }
+
+    h1{ font-size:1.4rem; margin:0 0 0.5rem; }
+
+    .sub{
+      font-size:0.9rem;
+      color:var(--text-muted);
+      margin-bottom:1.1rem;
+    }
+
+    .well{
+      border:1px solid var(--border-subtle);
+      background:#f9fafb;
+      border-radius:14px;
+      padding:0.9rem;
+      margin-bottom:1rem;
+    }
+
+    .well-title{
+      font-size:0.8rem;
+      color:var(--text-muted);
+      margin:0 0 0.6rem;
+      letter-spacing:0.01em;
+    }
+
+    /* Output block / viz */
+    .viz{
+      border:1px solid var(--border-subtle);
+      background:#ffffff;
+      border-radius:12px;
+      padding:0.75rem;
+      margin-bottom:0.85rem;
+    }
+
+    .viz-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      gap:0.75rem;
+      margin-bottom:0.55rem;
+    }
+
+    .viz-title{ font-size:0.8rem; color:var(--text-muted); }
+    .viz-metric{ font-size:0.8rem; color:var(--text-muted); white-space:nowrap; }
+
+    .bar-area{
+      position:relative;
+      height:14px;
+      border-radius:999px;
+      background:#e5e7eb;
+      overflow:hidden;
+    }
+
+    .bar-fill{
+      height:100%;
+      width:35%;
+      border-radius:999px;
+      background: var(--uvi-vhigh);
+      transition: width 0.15s ease-out, background-color 0.15s ease-out;
+    }
+
+    .reapply-tick{
+      position:absolute;
+      top:-6px;
+      width:2px;
+      height:26px;
+      background:#111827;
+      opacity:0.25;
+      border-radius:2px;
+    }
+
+    .bar-legend{
+      display:flex;
+      justify-content:space-between;
+      font-size:0.72rem;
+      color:var(--text-muted);
+      margin-top:0.45rem;
+    }
+
+    /* Slider layout */
+    .slider-block{ margin-bottom:0.85rem; }
+
+    .slider-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:0.75rem;
+      font-size:0.9rem;
+      margin-bottom:0.35rem;
+    }
+
+    .slider-left{
+      display:flex;
+      align-items:center;
+      gap:0.5rem;
+      min-width: 12rem;
+    }
+
+    .swatch{
+      width:14px;
+      height:14px;
+      border-radius:999px;
+      border:1px solid rgba(17,24,39,0.15);
+      box-shadow: 0 1px 0 rgba(17,24,39,0.04) inset;
+      flex:0 0 auto;
+      background:#e5e7eb;
+    }
+
+    .slider-value{ font-weight:600; white-space:nowrap; }
+
+    /* Colorful sliders (IMPORTANT: set track gradients in CSS so colors never vanish) */
+    .range{
+      width:100%;
+      -webkit-appearance:none;
+      appearance:none;
+      height:8px;
+      border-radius:999px;
+      outline:none;
+      background:#e5e7eb;
+    }
+
+    /* Track colors by ID (works even if JS fails) */
+    #skinSlider{
+      background: linear-gradient(90deg, var(--skin1), var(--skin6));
+    }
+    #spfSlider{
+      background: linear-gradient(90deg, rgba(96,165,250,0.60), rgba(34,197,94,0.60));
+    }
+    #uviSlider{
+      background: linear-gradient(90deg,
+        var(--uvi-low),
+        var(--uvi-mod),
+        var(--uvi-high),
+        var(--uvi-vhigh),
+        var(--uvi-ext)
+      );
+    }
+
+    .range::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      appearance:none;
+      width:18px;
+      height:18px;
+      border-radius:50%;
+      background:#111827;
+      cursor:pointer;
+      box-shadow:0 0 0 3px rgba(17,24,39,0.12);
+      border:0;
+    }
+
+    .range::-moz-range-thumb{
+      width:18px;
+      height:18px;
+      border-radius:50%;
+      background:#111827;
+      cursor:pointer;
+      border:none;
+      box-shadow:0 0 0 3px rgba(17,24,39,0.12);
+    }
+
+    /* Output (single card feel, but inside the same well) */
+    .output-header{
+      display:flex;
+      align-items:center;
+      gap:0.45rem;
+      margin-bottom:0.35rem;
+    }
+    .output-icon{ font-size:1rem; }
+    .output-label{ font-size:0.8rem; color:var(--text-muted); }
+
+    .output-value{
+      font-size:1.6rem;
+      font-weight:700;
+      margin:0 0 0.25rem;
+    }
+
+    .output-sub{
+      font-size:0.78rem;
+      color:var(--text-muted);
+      line-height:1.35;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+  <h1>Max Safe Sun Time</h1>
+  <div class="sub">
+    Prototype model. Adjust Skin Type, SPF, and UV Index to estimate maximum time in direct sun.
+  </div>
+
+  <!-- OUTPUT WELL (viz + only output) -->
+  <div class="well">
+    <div class="well-title">Result</div>
+
+    <div class="viz" aria-label="Visualization">
+      <div class="viz-header">
+        <div class="viz-title">Estimated max safe time (bar)</div>
+        <div class="viz-metric"><span id="vizMinutes">—</span></div>
+      </div>
+
+      <div class="bar-area" role="img" aria-label="Max safe time bar">
+        <div id="barFill" class="bar-fill"></div>
+        <div id="reapplyTick" class="reapply-tick" title="Reapply marker (2h)"></div>
+      </div>
+
+      <div class="bar-legend">
+        <span>0 min</span>
+        <span>2h reapply</span>
+        <span>6h+</span>
+      </div>
+    </div>
+
+    <div class="output-header">
+      <span class="output-icon">☀️</span>
+      <span class="output-label">Max safe sun time</span>
+    </div>
+    <div class="output-value" id="maxSafeMain">—</div>
+    <div class="output-sub">
+      Assumes proper application and <strong>reapplying every 2 hours</strong> and after <strong>swimming/sweating</strong>.
+      Real-world conditions (clouds, reflection, altitude) can change exposure.
+    </div>
+  </div>
+
+  <!-- INPUTS WELL -->
+  <div class="well">
+    <div class="well-title">Inputs</div>
+
+    <!-- Skin Type -->
+    <div class="slider-block">
+      <div class="slider-header">
+        <div class="slider-left">
+          <span class="swatch" id="skinSwatch"></span>
+          <div>Skin Type</div>
+        </div>
+        <div class="slider-value" id="skinLabel">Type III</div>
+      </div>
+      <input id="skinSlider" class="range" type="range" min="1" max="6" step="1" value="3" />
+    </div>
+
+    <!-- SPF (discrete via index mapping) -->
+    <div class="slider-block">
+      <div class="slider-header">
+        <div class="slider-left">
+          <span class="swatch" id="spfSwatch"></span>
+          <div>SPF</div>
+        </div>
+        <div class="slider-value" id="spfLabel">SPF 30</div>
+      </div>
+      <input id="spfSlider" class="range" type="range" min="0" max="6" step="1" value="4" />
+    </div>
+
+    <!-- UVI -->
+    <div class="slider-block" style="margin-bottom:0;">
+      <div class="slider-header">
+        <div class="slider-left">
+          <span class="swatch" id="uviSwatch"></span>
+          <div>UV Index</div>
+        </div>
+        <div class="slider-value" id="uviLabel">UVI 8</div>
+      </div>
+      <input id="uviSlider" class="range" type="range" min="0" max="11" step="1" value="8" />
+    </div>
+  </div>
+</div>
+
+<script>
+  // Baseline minutes to burn at UVI = 1 (simple, deterministic)
+  const BASELINE_AT_UVI1 = { 1:67, 2:100, 3:200, 4:300, 5:400, 6:500 };
+
+  // SPF options (bottle-ish)
+  const SPF_OPTIONS = [0, 10, 15, 20, 30, 40, 50];
+
+  // DOM
+  const skinSlider = document.getElementById('skinSlider');
+  const spfSlider  = document.getElementById('spfSlider');
+  const uviSlider  = document.getElementById('uviSlider');
+
+  const skinLabel  = document.getElementById('skinLabel');
+  const spfLabel   = document.getElementById('spfLabel');
+  const uviLabel   = document.getElementById('uviLabel');
+
+  const skinSwatch = document.getElementById('skinSwatch');
+  const spfSwatch  = document.getElementById('spfSwatch');
+  const uviSwatch  = document.getElementById('uviSwatch');
+
+  const maxSafeMain = document.getElementById('maxSafeMain');
+
+  // Viz
+  const vizMinutes = document.getElementById('vizMinutes');
+  const barFill = document.getElementById('barFill');
+  const reapplyTick = document.getElementById('reapplyTick');
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function skinTypeLabel(n){
+    const roman = ["I","II","III","IV","V","VI"][n-1] || String(n);
+    return `Type ${roman}`;
+  }
+
+  function skinColor(n){
+    return cssVar(`--skin${n}`) || "#e5e7eb";
+  }
+
+  function uviColor(uvi){
+    if (uvi <= 2) return cssVar('--uvi-low');
+    if (uvi <= 5) return cssVar('--uvi-mod');
+    if (uvi <= 7) return cssVar('--uvi-high');
+    if (uvi <= 10) return cssVar('--uvi-vhigh');
+    return cssVar('--uvi-ext');
+  }
+
+  function formatMinutes(m){
+    if (!isFinite(m) || m <= 0) return "0 min";
+    if (m >= 999) return "999+ min";
+    return `${Math.round(m)} min`;
+  }
+
+  // SPF effect: diminishing returns (toy model, avoids “SPF 30 => 30x time” explosion)
+  // effectiveMultiplier = 1 + 0.9 * sqrt(SPF)
+  // SPF 0 => 1.0x
+  // SPF 10 => ~3.8x, SPF 30 => ~5.9x, SPF 50 => ~7.4x
+  function spfEffectiveMultiplier(spf){
+    if (spf <= 0) return 1;
+    return 1 + 0.9 * Math.sqrt(spf);
+  }
+
+  // Model:
+  // baselineBurn = baselineAtUVI1 / max(UVI, 0.5)
+  // maxSafe = baselineBurn * effectiveMultiplier
+  function compute(){
+    const skin = parseInt(skinSlider.value, 10);
+    const spf  = SPF_OPTIONS[parseInt(spfSlider.value, 10)] ?? 30;
+    const uvi  = parseInt(uviSlider.value, 10);
+
+    const baselineAt1 = BASELINE_AT_UVI1[skin] ?? 200;
+
+    // floor UVI at 0.5 to avoid infinity at UVI=0
+    const uviEff = Math.max(uvi, 0.5);
+    const baselineBurn = baselineAt1 / uviEff;
+
+    const mult = spfEffectiveMultiplier(spf);
+    const maxSafe = baselineBurn * mult;
+
+    return { skin, spf, uvi, baselineAt1, maxSafe };
+  }
+
+  function updateViz(state){
+    // Clamp bar scaling so it always moves
+    // 0..360 min maps to 0..100% (6h saturates)
+    const clampMax = 360;
+    const pct = Math.max(0, Math.min(1, state.maxSafe / clampMax));
+    barFill.style.width = `${Math.round(pct * 100)}%`;
+
+    // Bar color reflects UVI severity
+    barFill.style.backgroundColor = uviColor(state.uvi);
+
+    // Reapply tick at 120 min on same scale
+    const reapplyPct = Math.max(0, Math.min(1, 120 / clampMax));
+    reapplyTick.style.left = `calc(${Math.round(reapplyPct * 100)}% - 1px)`;
+
+    vizMinutes.textContent = formatMinutes(state.maxSafe);
+  }
+
+  function updateUI(){
+    const s = compute();
+
+    // Labels
+    skinLabel.textContent = skinTypeLabel(s.skin);
+    spfLabel.textContent  = (s.spf === 0) ? "No SPF" : (s.spf === 50 ? "SPF 50+" : `SPF ${s.spf}`);
+    uviLabel.textContent  = `UVI ${s.uvi}`;
+
+    // Swatches
+    skinSwatch.style.background = skinColor(s.skin);
+    spfSwatch.style.background  = "linear-gradient(90deg, rgba(96,165,250,0.45), rgba(34,197,94,0.45))";
+    uviSwatch.style.background  = uviColor(s.uvi);
+
+    // Viz + single output
+    updateViz(s);
+    maxSafeMain.textContent = formatMinutes(s.maxSafe);
+  }
+
+  skinSlider.addEventListener('input', updateUI);
+  spfSlider.addEventListener('input', updateUI);
+  uviSlider.addEventListener('input', updateUI);
+
+  updateUI();
+</script>
+</body>
+</html>
