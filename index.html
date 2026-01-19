@@ -253,7 +253,7 @@
 
       <div class="bar-legend">
         <span>0 min</span>
-        <span>2h reapply</span>
+        <span>2h</span>
         <span>6h+</span>
       </div>
     </div>
@@ -394,22 +394,7 @@
     return { skin, spf, uvi, baselineAt1, maxSafe };
   }
 
-  function updateViz(state){
-    // Clamp bar scaling so it always moves
-    // 0..360 min maps to 0..100% (6h saturates)
-    const clampMax = 360;
-    const pct = Math.max(0, Math.min(1, state.maxSafe / clampMax));
-    barFill.style.width = `${Math.round(pct * 100)}%`;
-
-    // Bar color reflects UVI severity
-    barFill.style.backgroundColor = uviColor(state.uvi);
-
-    // Reapply tick at 120 min on same scale
-    const reapplyPct = Math.max(0, Math.min(1, 120 / clampMax));
-    reapplyTick.style.left = `calc(${Math.round(reapplyPct * 100)}% - 1px)`;
-
-    vizMinutes.textContent = formatMinutes(state.maxSafe);
-  }
+function updateViz(state){
 
   function updateUI(){
     const s = compute();
